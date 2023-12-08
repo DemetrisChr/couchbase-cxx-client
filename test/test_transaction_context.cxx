@@ -54,7 +54,7 @@ simple_txn_wrapper(transaction_context& tx, Handler&& handler)
         // in transactions.run, we currently handle exceptions that may come back from the
         // txn logic as well (using tx::handle_error).
         handler();
-        tx.finalize([barrier](std::optional<transaction_exception> err, std::optional<couchbase::transactions::transaction_result> result) {
+        tx.finalize(false, [barrier](std::optional<transaction_exception> err, std::optional<couchbase::transactions::transaction_result> result) {
             if (err) {
                 return barrier->set_exception(std::make_exception_ptr(*err));
             }
@@ -138,7 +138,7 @@ TEST_CASE("transactions: can do simple transaction with finalize", "[transaction
                        CHECK_FALSE(err);
                    });
     });
-    tx.finalize([&barrier](std::optional<transaction_exception> err, std::optional<couchbase::transactions::transaction_result>) {
+    tx.finalize(false, [&barrier](std::optional<transaction_exception> err, std::optional<couchbase::transactions::transaction_result>) {
         if (err) {
             return barrier->set_exception(std::make_exception_ptr(*err));
         }

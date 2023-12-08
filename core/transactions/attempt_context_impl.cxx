@@ -735,14 +735,18 @@ attempt_context_impl::remove(const transaction_get_result& document)
 }
 
 static core::operations::query_request
-wrap_query_request(const couchbase::transactions::transaction_query_options& opts, const transaction_context& txn_context)
+wrap_query_request(const couchbase::transactions::transaction_query_options& opts, const transaction_context& txn_context, bool tximplicit)
 {
     // build what we can directly from the options:
     auto req = core::impl::build_transaction_query_request(opts.get_query_options().build());
     // set timeout to remaining time plus some extra time, so we don't time out right at expiry.
     auto extra = core::timeout_defaults::key_value_durable_timeout;
     if (!req.scan_consistency) {
-        req.scan_consistency = txn_context.config().query_config.scan_consistency;
+        if (tximplicit) {
+            req.scan_consistency = query_scan_consistency::request_plus;
+        } else {
+            req.scan_consistency = txn_context.config().query_config.scan_consistency;
+        }
     }
     auto remaining = std::chrono::duration_cast<std::chrono::milliseconds>(txn_context.remaining());
     req.timeout = remaining + extra + std::chrono::milliseconds(1000); // match java with 1 second over the kv durable timeout.
@@ -754,6 +758,7 @@ wrap_query_request(const couchbase::transactions::transaction_query_options& opt
 void
 attempt_context_impl::query_begin_work(std::optional<std::string> query_context, std::function<void(std::exception_ptr)>&& cb)
 {
+    CB_LOG_DEBUG("Query begin work called");
     // construct the txn_data and query options for the existing transaction
     couchbase::transactions::transaction_query_options opts;
     tao::json::value txdata;
@@ -804,6 +809,7 @@ attempt_context_impl::query_begin_work(std::optional<std::string> query_context,
                opts,
                params,
                txdata,
+               false,
                STAGE_QUERY_BEGIN_WORK,
                false,
                query_context,
@@ -937,6 +943,7 @@ void
 attempt_context_impl::do_query(const std::string& statement,
                                const couchbase::transactions::transaction_query_options& opts,
                                std::optional<std::string> query_context,
+                               bool tximplicit,
                                QueryCallback&& cb)
 {
     std::vector<core::json_string> params;
@@ -946,6 +953,7 @@ attempt_context_impl::do_query(const std::string& statement,
                opts,
                params,
                txdata,
+               tximplicit,
                STAGE_QUERY,
                true,
                query_context,
@@ -978,13 +986,14 @@ attempt_context_impl::wrap_query(const std::string& statement,
                                  const couchbase::transactions::transaction_query_options& opts,
                                  const std::vector<core::json_string>& params,
                                  const tao::json::value& txdata,
+                                 bool tximplicit,
                                  const std::string& hook_point,
                                  bool check_expiry,
                                  std::optional<std::string> query_context,
                                  std::function<void(std::exception_ptr, core::operations::query_response)>&& cb)
 {
-    auto req = wrap_query_request(opts, overall_);
-    if (statement != BEGIN_WORK) {
+    auto req = wrap_query_request(opts, overall_, tximplicit);
+    if (statement != BEGIN_WORK && !tximplicit) {
         auto mode = op_list_.get_mode();
         assert(mode.is_query());
         if (!op_list_.get_mode().query_node.empty()) {
@@ -1011,12 +1020,26 @@ attempt_context_impl::wrap_query(const std::string& statement,
     if (!params.empty()) {
         req.positional_parameters = params;
     }
-    if (statement != BEGIN_WORK) {
+
+    if (statement != BEGIN_WORK && !tximplicit) {
         req.raw["txid"] = jsonify(id());
     }
+
     if (txdata.is_object() && !txdata.get_object().empty()) {
         req.raw["txdata"] = core::utils::json::generate(txdata);
     }
+
+    CB_LOG_DEBUG("Setting tximplicit-specific raw query opts");
+    if (tximplicit) {
+        req.raw["tximplicit"] = "true";
+        req.raw["durability_level"] = core::utils::json::generate(durability_level_to_string_for_query(overall_.config().level));
+        if (overall_.config().metadata_collection) {
+            auto id = atr_id_from_bucket_and_key(overall_.config(), "", "");
+            req.raw["atrcollection"] = fmt::format("\"`{}`.`{}`.`{}`\"", id.bucket(), id.scope(), id.collection());
+        }
+    }
+    CB_LOG_DEBUG("Successfully set tximplicit-specific raw query opts");
+
     req.statement = statement;
     if (auto ec = hooks_.before_query(this, statement)) {
         auto err = std::make_exception_ptr(transaction_operation_failed(*ec, "before_query hook raised error"));
@@ -1042,8 +1065,16 @@ attempt_context_impl::query(const std::string& statement,
                             std::optional<std::string> query_context,
                             QueryCallback&& cb)
 {
+    bool tximplicit = options.get_query_options().build().as_transaction;
+
     return cache_error_async(cb, [&]() {
         check_if_done(cb);
+
+        if (tximplicit) {
+            CB_LOG_DEBUG("This is in tximplicit mode, skipping set_query_mode & begin_work");
+            return do_query(statement, options, query_context, true, std::move(cb));
+        }
+
         // decrement in_flight, as we just incremented it in cache_error_async.
         op_list_.set_query_mode(
           [this, statement, options, query_context, cb]() mutable {
@@ -1056,10 +1087,10 @@ attempt_context_impl::query(const std::string& statement,
                                    if (err) {
                                        return op_completed_with_error(std::move(cb), err);
                                    }
-                                   return do_query(statement, options, query_context, std::move(cb));
+                                   return do_query(statement, options, query_context, false, std::move(cb));
                                });
           },
-          [this, statement, options, query_context, cb]() mutable { return do_query(statement, options, query_context, std::move(cb)); });
+          [this, statement, options, query_context, cb]() mutable { return do_query(statement, options, query_context, false, std::move(cb)); });
     });
 }
 
@@ -1136,6 +1167,7 @@ attempt_context_impl::get_with_query(const core::document_id& id, bool optional,
                           opts,
                           params,
                           make_kv_txdata(),
+                          false,
                           STAGE_QUERY_KV_GET,
                           true,
                           {},
@@ -1187,6 +1219,7 @@ attempt_context_impl::insert_raw_with_query(const core::document_id& id, const s
                           opts,
                           params,
                           make_kv_txdata(),
+                          false,
                           STAGE_QUERY_KV_INSERT,
                           true,
                           {},
@@ -1231,6 +1264,7 @@ attempt_context_impl::replace_raw_with_query(const transaction_get_result& docum
           opts,
           params,
           make_kv_txdata(document),
+          false,
           STAGE_QUERY_KV_REPLACE,
           true,
           {},
@@ -1274,6 +1308,7 @@ attempt_context_impl::remove_with_query(const transaction_get_result& document, 
           opts,
           params,
           make_kv_txdata(document),
+          false,
           STAGE_QUERY_KV_REMOVE,
           true,
           {},
@@ -1311,6 +1346,7 @@ attempt_context_impl::commit_with_query(VoidCallback&& cb)
       opts,
       params,
       make_kv_txdata(std::nullopt),
+      false,
       STAGE_QUERY_COMMIT,
       true,
       {},
@@ -1348,6 +1384,7 @@ attempt_context_impl::rollback_with_query(VoidCallback&& cb)
                opts,
                params,
                make_kv_txdata(std::nullopt),
+               false,
                STAGE_QUERY_ROLLBACK,
                true,
                {},

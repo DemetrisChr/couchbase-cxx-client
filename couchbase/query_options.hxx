@@ -24,6 +24,7 @@
 #include <couchbase/query_profile.hxx>
 #include <couchbase/query_result.hxx>
 #include <couchbase/query_scan_consistency.hxx>
+#include <couchbase/transactions/single_query_transaction_options.hxx>
 
 #include <chrono>
 #include <functional>
@@ -51,6 +52,7 @@ struct query_options : public common_options<query_options> {
         const bool readonly;
         const bool flex_index;
         const bool preserve_expiry;
+        const bool as_transaction;
         std::optional<bool> use_replica;
         std::optional<std::uint64_t> max_parallelism;
         std::optional<std::uint64_t> scan_cap;
@@ -64,6 +66,7 @@ struct query_options : public common_options<query_options> {
         std::vector<codec::binary> positional_parameters;
         std::map<std::string, codec::binary, std::less<>> named_parameters;
         std::map<std::string, codec::binary, std::less<>> raw;
+        std::optional<transactions::single_query_transaction_options::built> single_query_transaction_options;
     };
 
     /**
@@ -85,6 +88,7 @@ struct query_options : public common_options<query_options> {
             readonly_,
             flex_index_,
             preserve_expiry_,
+            as_transaction_,
             use_replica_,
             max_parallelism_,
             scan_cap_,
@@ -98,6 +102,7 @@ struct query_options : public common_options<query_options> {
             positional_parameters_,
             named_parameters_,
             raw_,
+            (single_query_transaction_options_) ? std::make_optional(single_query_transaction_options_.value().build()) : std::nullopt,
         };
     }
 
@@ -522,6 +527,36 @@ struct query_options : public common_options<query_options> {
         return self();
     }
 
+    /**
+     * Specifies that the query should be run as a transaction with the given options
+     *
+     * @param single_query_transaction_options the single query transaction options
+     * @return this options builder for chaining purposes.
+     *
+     * @since 1.0.0
+     * @committed
+     */
+    auto as_transaction(transactions::single_query_transaction_options single_query_transaction_options) -> query_options&
+    {
+        as_transaction_ = true;
+        single_query_transaction_options_ = single_query_transaction_options;
+        return self();
+    }
+
+    /**
+     * Specifies that the query should be run as a transaction
+     *
+     * @return this options builder for chaining purposes.
+     *
+     * @since 1.0.0
+     * @committed
+     */
+    auto as_transaction() -> query_options&
+    {
+        as_transaction_ = true;
+        return self();
+    }
+
   private:
     template<typename Parameter, typename... Rest>
     void encode_positional_parameters(const Parameter& parameter, Rest... args)
@@ -546,6 +581,7 @@ struct query_options : public common_options<query_options> {
     bool readonly_{ false };
     bool flex_index_{ false };
     bool preserve_expiry_{ false };
+    bool as_transaction_{ false };
     std::optional<bool> use_replica_{};
     std::optional<std::uint64_t> max_parallelism_{};
     std::optional<std::uint64_t> scan_cap_{};
@@ -559,6 +595,7 @@ struct query_options : public common_options<query_options> {
     std::vector<codec::binary> positional_parameters_{};
     std::map<std::string, codec::binary, std::less<>> raw_{};
     std::map<std::string, codec::binary, std::less<>> named_parameters_{};
+    std::optional<transactions::single_query_transaction_options> single_query_transaction_options_{};
 };
 
 /**

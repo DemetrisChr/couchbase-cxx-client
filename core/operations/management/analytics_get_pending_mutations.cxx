@@ -18,6 +18,7 @@
 #include "analytics_get_pending_mutations.hxx"
 
 #include "core/utils/json.hxx"
+#include "core/logger/logger.hxx"
 #include "error_utils.hxx"
 
 #include <fmt/core.h>
@@ -44,6 +45,7 @@ analytics_get_pending_mutations_request::make_response(error_context::http&& ctx
             response.ctx.ec = errc::common::parsing_failure;
             return response;
         }
+        CB_LOG_WARNING("get pending mutations resp = {}", core::utils::json::generate(payload));
         if (encoded.status_code == 200) {
             if (payload.is_object()) {
                 for (const auto& [dataverse, entry] : payload.get_object()) {

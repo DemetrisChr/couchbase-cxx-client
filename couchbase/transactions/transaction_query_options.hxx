@@ -245,6 +245,13 @@ class transaction_query_options
     }
 
     /** @private */
+    transaction_query_options& single_query()
+    {
+        opts_.as_transaction();
+        return *this;
+    }
+
+    /** @private */
     transaction_query_options& encoded_raw_options(std::map<std::string, codec::binary, std::less<>> options)
     {
         opts_.encoded_raw_options(options);

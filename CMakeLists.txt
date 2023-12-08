@@ -373,6 +373,7 @@ set(couchbase_cxx_client_FILES
     core/transactions/exceptions.cxx
     core/transactions/internal/doc_record.cxx
     core/transactions/result.cxx
+    core/transactions/single_query_transaction_options.cxx
     core/transactions/staged_mutation.cxx
     core/transactions/transaction_attempt.cxx
     core/transactions/transaction_context.cxx

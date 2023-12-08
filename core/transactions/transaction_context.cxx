@@ -205,18 +205,21 @@ transaction_context::existing_error(bool previous_op_failed)
 }
 
 void
-transaction_context::handle_error(std::exception_ptr err, txn_complete_callback&& callback)
+transaction_context::handle_error(std::exception_ptr err, bool single_query_transaction_mode, txn_complete_callback&& callback)
 {
     try {
         try {
             std::rethrow_exception(err);
-        } catch (const op_exception& e) {
+        } catch (op_exception e) {
+            if (single_query_transaction_mode) {
+                throw e;
+            }
             // turn this into a transaction_operation_failed
             throw transaction_operation_failed(FAIL_OTHER, e.what()).cause(e.cause());
         }
     } catch (const transaction_operation_failed& er) {
         CB_ATTEMPT_CTX_LOG_ERROR(current_attempt_context_, "got transaction_operation_failed {}", er.what());
-        if (er.should_rollback()) {
+        if (er.should_rollback() && !single_query_transaction_mode) {
             CB_ATTEMPT_CTX_LOG_TRACE(current_attempt_context_, "got rollback-able exception, rolling back");
             try {
                 current_attempt_context_->rollback();
@@ -283,22 +286,23 @@ transaction_context::handle_error(std::exception_ptr err, txn_complete_callback&
 }
 
 void
-transaction_context::finalize(txn_complete_callback&& cb)
+transaction_context::finalize(bool single_query_transaction_mode, txn_complete_callback&& cb)
 {
-
     try {
         existing_error(false);
-        if (current_attempt_context_->is_done()) {
+        if (single_query_transaction_mode || current_attempt_context_->is_done()) {
+            CB_LOG_DEBUG("Finalize without error...");
             return cb(std::nullopt, get_transaction_result());
         }
         commit([this, cb = std::move(cb)](std::exception_ptr err) mutable {
             if (err) {
-                return handle_error(err, std::move(cb));
+                return handle_error(err, false, std::move(cb));
             }
             cb(std::nullopt, get_transaction_result());
         });
     } catch (...) {
-        return handle_error(std::current_exception(), std::move(cb));
+        CB_LOG_DEBUG("Handling error during finalize...");
+        return handle_error(std::current_exception(), single_query_transaction_mode, std::move(cb));
     }
 }
 

@@ -18,6 +18,7 @@
 #pragma once
 
 #include <couchbase/error_context.hxx>
+#include <couchbase/transaction_error_context.hxx>
 
 #include <cstdint>
 #include <optional>
@@ -56,7 +57,8 @@ class query_error_context : public error_context
                         std::uint32_t http_status,
                         std::string http_body,
                         std::string hostname,
-                        std::uint16_t port)
+                        std::uint16_t port,
+                        std::optional<transaction_error_context> txn_error_context)
       : error_context{ {}, ec, std::move(last_dispatched_to), std::move(last_dispatched_from), retry_attempts, std::move(retry_reasons) }
       , first_error_code_{ first_error_code }
       , first_error_message_{ std::move(first_error_message) }
@@ -69,6 +71,7 @@ class query_error_context : public error_context
       , http_body_{ std::move(http_body) }
       , hostname_{ std::move(hostname) }
       , port_{ port }
+      , txn_error_context_{ txn_error_context }
     {
     }
 
@@ -127,6 +130,11 @@ class query_error_context : public error_context
         return port_;
     }
 
+    [[nodiscard]] auto txn_error_context() const -> std::optional<transaction_error_context>
+    {
+        return txn_error_context_;
+    }
+
     [[nodiscard]] auto to_json() const -> std::string;
 
   private:
@@ -141,5 +149,6 @@ class query_error_context : public error_context
     std::string http_body_{};
     std::string hostname_{};
     std::uint16_t port_{};
+    std::optional<couchbase::transaction_error_context> txn_error_context_{};
 };
 } // namespace couchbase

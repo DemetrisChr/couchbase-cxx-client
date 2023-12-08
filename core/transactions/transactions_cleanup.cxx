@@ -395,10 +395,12 @@ transactions_cleanup::get_active_clients(const couchbase::transactions::transact
 void
 transactions_cleanup::remove_client_record_from_all_buckets(const std::string& uuid)
 {
+    CB_LOST_ATTEMPT_CLEANUP_LOG_DEBUG("Called remove_client_record_from_all_buckets");
     for (const auto& keyspace : collections_) {
         try {
             retry_op_exponential_backoff_timeout<void>(
               std::chrono::milliseconds(10), std::chrono::milliseconds(250), std::chrono::milliseconds(500), [this, keyspace, uuid]() {
+                  CB_LOST_ATTEMPT_CLEANUP_LOG_DEBUG("Called LAMBDA in remove_client_record_from_all_buckets");
                   try {
                       // proceed to remove the client uuid if it exists
                       auto ec = config_.cleanup_hooks->client_record_before_remove_client(keyspace.bucket);

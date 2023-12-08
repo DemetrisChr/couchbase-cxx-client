@@ -27,12 +27,14 @@
 
 #include "core/cluster.hxx"
 #include "core/logger/logger.hxx"
+#include "core/operations/document_query.hxx"
 
 #include <spdlog/common.h>
 
 #include <cmath>
 #include <functional>
 #include <thread>
+#include <optional>
 
 // workaround for MSVC define overlap with log levels
 #undef ERROR
@@ -61,6 +63,9 @@ using async_logic = std::function<void(async_attempt_context&)>;
 /** @brief AsyncTransaction callback when transaction has completed */
 using txn_complete_callback =
   std::function<void(std::optional<transaction_exception>, std::optional<::couchbase::transactions::transaction_result>)>;
+
+/** @brief SingleQuery callback when transaction has completed */
+using txn_single_query_callback = std::function<void(std::optional<transaction_exception>, core::operations::query_response)>;
 
 /**
  * @mainpage
@@ -181,6 +186,12 @@ class transactions : public couchbase::transactions::transactions
     void run(couchbase::transactions::async_txn_logic&& code,
              couchbase::transactions::async_txn_complete_logic&& complete_cb,
              const couchbase::transactions::transaction_options& cfg = {}) override;
+
+    void single_query(const std::string& statement,
+                      const couchbase::query_options::built& options,
+                      std::optional<std::string> query_context,
+                      txn_single_query_callback&& cb);
+
     /**
      * @internal
      * called internally - will likely move

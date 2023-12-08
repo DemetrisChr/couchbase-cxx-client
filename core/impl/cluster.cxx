@@ -162,6 +162,17 @@ class cluster_impl : public std::enable_shared_from_this<cluster_impl>
 
     void query(std::string statement, query_options::built options, query_handler&& handler) const
     {
+        if (options.as_transaction) {
+            return transactions_->single_query(
+              std::move(statement), std::move(options), {},
+              [handler = std::move(handler)](auto txn_exc, auto resp) {
+                  if (txn_exc) {
+                      handler(core::impl::build_context(txn_exc.value().error_context(), resp), core::impl::build_result(resp));
+                  } else {
+                      handler(core::impl::build_context(resp), core::impl::build_result(resp));
+                  }
+              });
+        }
         return core_.execute(
           core::impl::build_query_request(std::move(statement), {}, std::move(options)),
           [handler = std::move(handler)](auto resp) { return handler(core::impl::build_context(resp), core::impl::build_result(resp)); });

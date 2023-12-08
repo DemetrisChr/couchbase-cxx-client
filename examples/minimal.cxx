@@ -40,6 +40,7 @@ main()
     asio::io_context io;
     auto guard = asio::make_work_guard(io);
     std::thread io_thread([&io]() { io.run(); });
+    std::thread io_thread2([&io]() { io.run(); });
 
     auto options = couchbase::cluster_options(username, password);
     options.apply_profile("wan_development");
@@ -59,10 +60,26 @@ main()
         std::cout << "ec: " << ctx.ec().message() << ", id: " << document_id << ", CAS: " << resp.cas().value() << "\n";
     }
 
+    auto [ctx, res] = cluster.query("SELECT 42 as foo", couchbase::query_options().as_transaction()).get();
+    std::cout << "ec: " << ctx.ec().message() << " res: " << res.rows_as_json().size() << "\n";
+
+    // auto [ctx2, res2] = cluster.query("SELEChrehT 4ghetqagherw2 as foo", couchbase::query_options().as_transaction()).get();
+    // std::cout << "ec: " << ctx2.ec().message() << " res: " << res2.rows_as_json().size() << "\n";
+
     cluster.close();
     guard.reset();
 
+    std::cout << "waiting for the io thread...\n";
+
     io_thread.join();
+
+    std::cout << "io thread joined\n";
+
+    std::cout << "waiting for the io thread 2...\n";
+
+    io_thread2.join();
+
+    std::cout << "io thread 2 joined\n";
 
     return 0;
 }

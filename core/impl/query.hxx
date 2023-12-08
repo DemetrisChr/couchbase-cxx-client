@@ -20,6 +20,12 @@
 #include "core/operations/document_query.hxx"
 
 #include <couchbase/query_options.hxx>
+#include <couchbase/query_result.hxx>
+#include <couchbase/query_error_context.hxx>
+#include <couchbase/transaction_error_context.hxx>
+
+#include <optional>
+#include <string>
 
 namespace couchbase::core::impl
 {
@@ -31,4 +37,7 @@ build_result(operations::query_response& resp);
 
 query_error_context
 build_context(operations::query_response& resp);
+
+query_error_context
+build_context(const transaction_error_context& txn_ctx, operations::query_response& resp);
 } // namespace couchbase::core::impl

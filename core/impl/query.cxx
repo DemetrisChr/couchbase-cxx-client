@@ -18,10 +18,12 @@
 #include <couchbase/error_codes.hxx>
 #include <couchbase/query_options.hxx>
 #include <couchbase/transactions/transaction_query_result.hxx>
+#include <couchbase/query_error_context.hxx>
 
 #include "core/cluster.hxx"
 #include "core/operations/document_query.hxx"
 #include "core/utils/binary.hxx"
+#include "core/transactions/exceptions.hxx"
 
 namespace couchbase::core::impl
 {
@@ -135,6 +137,31 @@ build_context(operations::query_response& resp)
         std::move(resp.ctx.http_body),
         std::move(resp.ctx.hostname),
         resp.ctx.port,
+        {},
+    };
+}
+
+query_error_context
+build_context(const transaction_error_context& txn_ctx, operations::query_response& resp)
+{
+    return {
+        resp.ctx.ec,
+        resp.ctx.last_dispatched_to,
+        resp.ctx.last_dispatched_from,
+        resp.ctx.retry_attempts,
+        std::move(resp.ctx.retry_reasons),
+        resp.ctx.first_error_code,
+        std::move(resp.ctx.first_error_message),
+        std::move(resp.ctx.client_context_id),
+        std::move(resp.ctx.statement),
+        std::move(resp.ctx.parameters),
+        std::move(resp.ctx.method),
+        std::move(resp.ctx.path),
+        resp.ctx.http_status,
+        std::move(resp.ctx.http_body),
+        std::move(resp.ctx.hostname),
+        resp.ctx.port,
+        std::move(txn_ctx),
     };
 }
 

@@ -161,11 +161,11 @@ class transaction_context
 
     void rollback(async_attempt_context::VoidCallback&& cb);
 
-    void finalize(txn_complete_callback&& cb);
+    void finalize(bool single_query_transaction_mode, txn_complete_callback&& cb);
 
     void existing_error(bool previous_op_failed = true);
 
-    void handle_error(std::exception_ptr err, txn_complete_callback&& cb);
+    void handle_error(std::exception_ptr err, bool single_query_transaction_mode, txn_complete_callback&& cb);
 
     std::chrono::nanoseconds remaining() const;
 

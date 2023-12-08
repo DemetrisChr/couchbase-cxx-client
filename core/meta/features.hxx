@@ -90,3 +90,5 @@
  * couchbase::cluster::search_indexes() support
  */
 #define COUCHBASE_CXX_CLIENT_HAS_PUBLIC_SEARCH_INDEX_MANAGEMENT 1
+
+#define COUCHBASE_CXX_CLIENT_HAS_TXNS_EXT_SINGLE_QEUERY 1

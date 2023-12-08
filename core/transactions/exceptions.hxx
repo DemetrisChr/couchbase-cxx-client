@@ -20,6 +20,7 @@
 #include "error_class.hxx"
 
 #include <couchbase/error_codes.hxx>
+#include <couchbase/transaction_op_error_context.hxx>
 #include <couchbase/transactions/transaction_result.hxx>
 
 #include <stdexcept>

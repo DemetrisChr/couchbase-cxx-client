@@ -146,12 +146,14 @@ class attempt_context_impl
     void do_query(const std::string& statement,
                   const couchbase::transactions::transaction_query_options& opts,
                   std::optional<std::string> query_context,
+                  bool tximplicit,
                   QueryCallback&& cb);
     std::exception_ptr handle_query_error(const core::operations::query_response& resp);
     void wrap_query(const std::string& statement,
                     const couchbase::transactions::transaction_query_options& opts,
                     const std::vector<core::json_string>& params,
                     const tao::json::value& txdata,
+                    bool tximplicit,
                     const std::string& hook_point,
                     bool check_expiry,
                     std::optional<std::string> query_context,
