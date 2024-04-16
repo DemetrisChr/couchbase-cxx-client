@@ -391,8 +391,8 @@ class pillowfight_app : public CLI::App
         bool stopping{ false };
         while (running.test_and_set() && !stopping) {
             std::list<std::pair<std::chrono::system_clock::time_point,
-                                std::variant<std::future<std::pair<couchbase::key_value_error_context, couchbase::mutation_result>>,
-                                             std::future<std::pair<couchbase::key_value_error_context, couchbase::get_result>>,
+                                std::variant<std::future<std::pair<couchbase::error, couchbase::mutation_result>>,
+                                             std::future<std::pair<couchbase::error, couchbase::get_result>>,
                                              std::future<std::pair<couchbase::query_error_context, couchbase::query_result>>>>>
               futures;
             for (std::size_t i = 0; i < key_value_batch_size_; ++i) {
@@ -444,20 +444,22 @@ class pillowfight_app : public CLI::App
                               return;
                           }
                       }
-                      auto [ctx, resp] = f.get();
+                      auto [err, resp] = f.get();
                       hdr_record_value_atomic(histogram, (std::chrono::system_clock::now() - start).count());
                       ++total;
-                      if (ctx.ec()) {
-                          const std::scoped_lock lock(errors_mutex);
-                          ++errors[ctx.ec()];
-                          if (verbose) {
-                              fmt::print(stderr, "\r\033[K{}\n", ctx.to_json());
-                          }
-                      } else if constexpr (std::is_same_v<
-                                             T,
-                                             std::future<std::pair<couchbase::key_value_error_context, couchbase::mutation_result>>>) {
-                          known_keys.emplace_back(ctx.id());
-                      }
+                      // TODO: Add back
+                      //                      if (ctx.ec()) {
+                      //                          const std::scoped_lock lock(errors_mutex);
+                      //                          ++errors[ctx.ec()];
+                      //                          if (verbose) {
+                      //                              fmt::print(stderr, "\r\033[K{}\n", err.ctx().to_json());
+                      //                          }
+                      //                      } else if constexpr (std::is_same_v<
+                      //                                             T,
+                      //                                             std::future<std::pair<couchbase::key_value_error_context,
+                      //                                             couchbase::mutation_result>>>) {
+                      //                          known_keys.emplace_back(ctx.id());
+                      //                      }
                   },
                   std::move(future));
             }
@@ -498,7 +500,7 @@ class pillowfight_app : public CLI::App
 
                 auto batch_size = std::min(keys_left, std::max(key_value_batch_size_, minimum_batch_size));
 
-                std::vector<std::future<std::pair<couchbase::key_value_error_context, couchbase::mutation_result>>> futures;
+                std::vector<std::future<std::pair<couchbase::error, couchbase::mutation_result>>> futures;
                 futures.reserve(batch_size);
                 for (std::size_t k = 0; k < batch_size; ++k) {
                     const std::string document_id = uniq_id("id");
@@ -506,8 +508,8 @@ class pillowfight_app : public CLI::App
                 }
 
                 for (auto&& future : futures) {
-                    auto [ctx, res] = future.get();
-                    if (ctx.ec()) {
+                    auto [err, res] = future.get();
+                    if (err.ec()) {
                         ++retried_keys;
                     } else {
                         ++stored_keys;

@@ -25,6 +25,7 @@
 #include <couchbase/boolean_query.hxx>
 #include <couchbase/cluster.hxx>
 #include <couchbase/fmt/cas.hxx>
+#include <couchbase/fmt/error.hxx>
 #include <couchbase/fmt/mutation_token.hxx>
 #include <couchbase/match_query.hxx>
 #include <couchbase/numeric_range_query.hxx>
@@ -84,22 +85,24 @@ main(int argc, const char* argv[])
     auto collection = scope.collection("users");
 
     { // [2] upsert document
-        auto [ctx, upsert_result] = collection.upsert("my-document", tao::json::value{ { "name", "mike" } }).get();
-        if (ctx.ec()) {
-            fmt::print("unable to upsert the document \"{}\": {}\n", ctx.id(), ctx.ec().message());
+        std::string doc_id = "my-document";
+        auto [err, upsert_result] = collection.upsert(doc_id, tao::json::value{ { "name", "mike" } }).get();
+        if (err.ec()) {
+            fmt::print("unable to upsert the document \"{}\": {}\n", doc_id, err);
             return 1;
         }
-        fmt::print("saved document \"{}\", cas={}, token={}\n", ctx.id(), upsert_result.cas(), upsert_result.mutation_token().value());
+        fmt::print("saved document \"{}\", cas={}, token={}\n", doc_id, upsert_result.cas(), upsert_result.mutation_token().value());
     }
 
     { // [3] get document
-        auto [ctx, get_result] = collection.get("my-document").get();
-        if (ctx.ec()) {
-            fmt::print("unable to get the document \"{}\": {}\n", ctx.id(), ctx.ec().message());
+        std::string doc_id = "my-document";
+        auto [err, get_result] = collection.get(doc_id).get();
+        if (err.ec()) {
+            fmt::print("unable to get the document \"{}\": {}\n", doc_id, err);
             return 1;
         }
         auto name = get_result.content_as<tao::json::value>()["name"].get_string();
-        fmt::print("retrieved document \"{}\", name=\"{}\"\n", ctx.id(), name);
+        fmt::print("retrieved document \"{}\", name=\"{}\"\n", doc_id, name);
     }
 
     { // [4] N1QL query
@@ -341,10 +344,11 @@ main(int argc, const char* argv[])
         couchbase::mutation_state state;
 
         {
-            auto [ctx, upsert_result] =
+            std::string doc_id = "prancing-pony";
+            auto [err, upsert_result] =
               collection
                 .upsert(
-                  "prancing-pony",
+                  doc_id,
                   tao::json::value{
                     { "title", "The Prancing Pony" },
                     { "type", "hotel" },
@@ -354,12 +358,12 @@ main(int argc, const char* argv[])
                       "wings that ran back towards the elevated ground of the hill, such that in the rear the second floor was at ground "
                       "level. " } })
                 .get();
-            if (ctx.ec()) {
-                fmt::print("unable to upsert the document \"{}\": {}\n", ctx.id(), ctx.ec().message());
+            if (err.ec()) {
+                fmt::print("unable to upsert the document \"{}\": {}\n", doc_id, err);
                 return 1;
             }
             fmt::print("saved document \"{}\", cas={}, token={}\n",
-                       ctx.id(),
+                       doc_id,
                        upsert_result.cas(),
                        upsert_result.mutation_token().value_or(couchbase::mutation_token{}));
             state.add(upsert_result);
@@ -662,27 +666,29 @@ main(int argc, const char* argv[])
 
         {
             fmt::print("CHILD(pid={}): upsert into collection\n", getpid());
-            auto [ctx, upsert_result] = collection.upsert("child-document", tao::json::value{ { "name", "mike" } }).get();
-            if (ctx.ec()) {
-                fmt::print("CHILD(pid={}): unable to upsert the document \"{}\": {}\n", getpid(), ctx.id(), ctx.ec().message());
+            std::string doc_id = "child-document";
+            auto [err, upsert_result] = collection.upsert(doc_id, tao::json::value{ { "name", "mike" } }).get();
+            if (err.ec()) {
+                fmt::print("CHILD(pid={}): unable to upsert the document \"{}\": {}\n", getpid(), doc_id, err);
                 return 1;
             }
             fmt::print("CHILD(pid={}): saved document \"{}\", cas={}, token={}\n",
                        getpid(),
-                       ctx.id(),
+                       doc_id,
                        upsert_result.cas(),
                        upsert_result.mutation_token().value());
         }
 
         {
             fmt::print("CHILD(pid={}): get from collection\n", getpid());
-            auto [ctx, get_result] = collection.get("parent-document").get();
-            if (ctx.ec()) {
-                fmt::print("CHILD(pid={}): unable to get the document \"{}\": {}\n", getpid(), ctx.id(), ctx.ec().message());
+            std::string doc_id = "parent-document";
+            auto [err, get_result] = collection.get(doc_id).get();
+            if (err.ec()) {
+                fmt::print("CHILD(pid={}): unable to get the document \"{}\": {}\n", getpid(), doc_id, err);
                 return 1;
             }
             auto name = get_result.content_as<tao::json::value>()["name"].get_string();
-            fmt::print("CHILD(pid={}): retrieved document \"{}\", name=\"{}\"\n", getpid(), ctx.id(), name);
+            fmt::print("CHILD(pid={}): retrieved document \"{}\", name=\"{}\"\n", getpid(), doc_id, name);
         }
 
         child_guard.reset();
@@ -701,12 +707,13 @@ main(int argc, const char* argv[])
 
         {
             auto collection = bucket.scope("tenant_agent_00").collection("users");
-            auto [ctx, upsert_result] = collection.upsert("parent-document", tao::json::value{ { "name", "mike" } }).get();
-            if (ctx.ec()) {
-                fmt::print("unable to upsert the document \"{}\": {}\n", ctx.id(), ctx.ec().message());
+            std::string doc_id = "tenant_agent_00";
+            auto [err, upsert_result] = collection.upsert(doc_id, tao::json::value{ { "name", "mike" } }).get();
+            if (err.ec()) {
+                fmt::print("unable to upsert the document \"{}\": {}\n", doc_id, err);
                 return 1;
             }
-            fmt::print("saved document \"{}\", cas={}, token={}\n", ctx.id(), upsert_result.cas(), upsert_result.mutation_token().value());
+            fmt::print("saved document \"{}\", cas={}, token={}\n", doc_id, upsert_result.cas(), upsert_result.mutation_token().value());
         }
         {
             auto inventory_scope = bucket.scope("inventory");

@@ -17,37 +17,30 @@
 
 #pragma once
 
-#include <string>
+#include <couchbase/error.hxx>
 
-#include <tao/json/value.hpp>
+#include <fmt/core.h>
 
-namespace couchbase
-{
-using internal_error_context = tao::json::value;
-
-class error_context
-{
-  public:
-    error_context() = default;
-    explicit error_context(internal_error_context internal);
-
-    [[nodiscard]] auto retry_attempts() const -> std::size_t;
-
-    [[nodiscard]] auto to_string() const -> std::string;
-    [[nodiscard]] auto to_json() const -> std::string;
-
-    template<typename T>
-    T as() const
+/**
+ * Helper for fmtlib to format @ref couchbase::error objects.
+ *
+ * @since 1.0.0
+ * @uncommitted
+ */
+template<>
+struct fmt::formatter<couchbase::error> {
+    template<typename ParseContext>
+    constexpr auto parse(ParseContext& ctx)
     {
-        if constexpr (std::is_same_v<T, internal_error_context>) {
-            return internal_;
-        } else {
-            return internal_.as<T>();
-        }
+        return ctx.begin();
     }
 
-  private:
-    internal_error_context internal_;
+    template<typename FormatContext>
+    auto format(const couchbase::error& err, FormatContext& ctx) const
+    {
+        if (err.message().empty()) {
+            return format_to(ctx.out(), "{} | {}", err.ec().message(), err.ctx().to_string());
+        }
+        return format_to(ctx.out(), "{} - {} | {}", err.ec().message(), err.message(), err.ctx().to_string());
+    }
 };
-
-} // namespace couchbase

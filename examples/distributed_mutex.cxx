@@ -93,39 +93,42 @@ class couchbase_mutex
       , timeout_{ timeout }
     {
         auto options = couchbase::upsert_options{}.retry_strategy(retry_strategy_).timeout(timeout_);
-        auto [ctx, resp] = collection_.upsert(document_id_, content_, options).get();
-        if (ctx.ec()) {
-            throw std::system_error(ctx.ec(),
-                                    fmt::format(R"(unable to create mutex "{}" (retries: {}))", document_id_, ctx.retry_attempts()));
+        auto [err, resp] = collection_.upsert(document_id_, content_, options).get();
+        if (err.ec()) {
+            throw std::system_error(err.ec(),
+                                    fmt::format(R"(unable to create mutex "{}" (retries: {}))", document_id_, err.ctx().retry_attempts()));
         }
         cas_ = resp.cas();
-        fmt::print(
-          "[created ] \"{}\", cas: {}, retries: {}, lock_duration: {}\n", document_id_, cas_.value(), ctx.retry_attempts(), lock_duration);
+        fmt::print("[created ] \"{}\", cas: {}, retries: {}, lock_duration: {}\n",
+                   document_id_,
+                   cas_.value(),
+                   err.ctx().retry_attempts(),
+                   lock_duration);
     }
 
     void lock()
     {
         std::scoped_lock lock(mutex_);
         auto options = couchbase::get_and_lock_options{}.retry_strategy(retry_strategy_).timeout(timeout_);
-        auto [ctx, resp] = collection_.get_and_lock(document_id_, lock_duration_, options).get();
-        if (ctx.ec()) {
-            throw std::system_error(ctx.ec(),
-                                    fmt::format(R"(unable to lock mutex "{}" (retries: {}))", document_id_, ctx.retry_attempts()));
+        auto [err, resp] = collection_.get_and_lock(document_id_, lock_duration_, options).get();
+        if (err) {
+            throw std::system_error(err.ec(),
+                                    fmt::format(R"(unable to lock mutex "{}" (retries: {}))", document_id_, err.ctx().retry_attempts()));
         }
         cas_ = resp.cas();
-        fmt::print("[locked  ] \"{}\", cas: {}, retries: {}\n", document_id_, cas_.value(), ctx.retry_attempts());
+        fmt::print("[locked  ] \"{}\", cas: {}, retries: {}\n", document_id_, cas_.value(), err.ctx().retry_attempts());
     }
 
     void unlock()
     {
         std::scoped_lock lock(mutex_);
         auto options = couchbase::unlock_options{}.timeout(timeout_);
-        auto ctx = collection_.unlock(document_id_, cas_, options).get();
-        if (ctx.ec()) {
-            throw std::system_error(ctx.ec(),
-                                    fmt::format(R"(unable to unlock mutex "{}" (retries: {}))", document_id_, ctx.retry_attempts()));
+        auto err = collection_.unlock(document_id_, cas_, options).get();
+        if (err) {
+            throw std::system_error(err.ec(),
+                                    fmt::format(R"(unable to unlock mutex "{}" (retries: {}))", document_id_, err.ctx().retry_attempts()));
         }
-        fmt::print("[unlocked] \"{}\", cas: {}, retries: {}\n", document_id_, cas_.value(), ctx.retry_attempts());
+        fmt::print("[unlocked] \"{}\", cas: {}, retries: {}\n", document_id_, cas_.value(), err.ctx().retry_attempts());
     }
 
   private:
@@ -167,10 +170,10 @@ main()
                                           { "author", "Lewis Carroll" },
                                           { "price_usd", 4.0 },
                                           { "writer_id", writer_id } };
-        auto [ctx, resp] = collection.upsert(document_id, basic_doc, {}).get();
+        auto [err, resp] = collection.upsert(document_id, basic_doc, {}).get();
         fmt::print("[stored  ] \"{}\", ec: {}, id: \"{}\", CAS: {}, writer_id: \"{}\"\n",
                    document_id,
-                   ctx.ec() ? ctx.ec().message() : "success",
+                   err.ec() ? err.ec().message() : "success",
                    document_id,
                    resp.cas().value(),
                    writer_id);

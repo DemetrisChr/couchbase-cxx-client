@@ -29,6 +29,8 @@ namespace couchbase
 class error
 {
   public:
+    error() = default;
+    error(std::error_code ec, std::string message);
     error(std::error_code ec, std::string message, error_context ctx);
     error(std::error_code ec, std::string message, error_context ctx, error cause);
 

@@ -407,7 +407,11 @@ set(couchbase_cxx_client_FILES
     core/utils/mutation_token.cxx
     core/utils/split_string.cxx
     core/utils/url_codec.cxx
-    core/view_query_options.cxx)
+    core/view_query_options.cxx
+        core/error_context/key_value_json.hxx
+        core/impl/error.hxx
+        couchbase/fmt/error.hxx
+        core/error_context/subdocument_json.hxx)
 
 if(COUCHBASE_CXX_CLIENT_BUILD_SHARED)
   add_library(couchbase_cxx_client SHARED ${couchbase_cxx_client_FILES})

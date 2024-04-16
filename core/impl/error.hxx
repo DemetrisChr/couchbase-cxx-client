@@ -17,37 +17,15 @@
 
 #pragma once
 
-#include <string>
+#include <couchbase/error.hxx>
+#include <couchbase/key_value_error_context.hxx>
+#include <couchbase/subdocument_error_context.hxx>
 
-#include <tao/json/value.hpp>
-
-namespace couchbase
+namespace couchbase::core::impl
 {
-using internal_error_context = tao::json::value;
+error
+make_error(const couchbase::key_value_error_context& core_ctx);
 
-class error_context
-{
-  public:
-    error_context() = default;
-    explicit error_context(internal_error_context internal);
-
-    [[nodiscard]] auto retry_attempts() const -> std::size_t;
-
-    [[nodiscard]] auto to_string() const -> std::string;
-    [[nodiscard]] auto to_json() const -> std::string;
-
-    template<typename T>
-    T as() const
-    {
-        if constexpr (std::is_same_v<T, internal_error_context>) {
-            return internal_;
-        } else {
-            return internal_.as<T>();
-        }
-    }
-
-  private:
-    internal_error_context internal_;
-};
-
-} // namespace couchbase
+error
+make_error(const couchbase::subdocument_error_context& core_ctx);
+} // namespace couchbase::core::impl

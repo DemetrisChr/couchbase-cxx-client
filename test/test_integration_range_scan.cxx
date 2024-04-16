@@ -44,8 +44,8 @@ populate_documents_for_range_scan(const couchbase::collection& collection,
 
     std::map<std::string, couchbase::mutation_token> mutations;
     for (const auto& id : ids) {
-        auto [ctx, resp] = collection.upsert<couchbase::codec::raw_binary_transcoder>(id, value, options).get();
-        REQUIRE_SUCCESS(ctx.ec());
+        auto [err, resp] = collection.upsert<couchbase::codec::raw_binary_transcoder>(id, value, options).get();
+        REQUIRE_SUCCESS(err.ec());
         REQUIRE(resp.mutation_token().has_value());
         mutations[id] = resp.mutation_token().value();
     }

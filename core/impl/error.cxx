@@ -15,8 +15,12 @@
  *   limitations under the License.
  */
 
-#include <couchbase/error_context.hxx>
 #include <couchbase/error.hxx>
+#include <couchbase/error_context.hxx>
+
+#include "core/error_context/key_value_json.hxx"
+#include "core/error_context/subdocument_json.hxx"
+#include "error.hxx"
 
 #include <memory>
 #include <optional>
@@ -26,6 +30,12 @@
 
 namespace couchbase
 {
+error::error(std::error_code ec, std::string message)
+  : ec_{ ec }
+  , message_{ std::move(message) }
+{
+}
+
 error::error(std::error_code ec, std::string message, couchbase::error_context ctx)
   : ec_{ ec }
   , message_{ std::move(message) }
@@ -73,4 +83,21 @@ error::operator bool() const
 {
     return ec_.value() != 0;
 }
+
+namespace core::impl
+{
+error
+make_error(const couchbase::key_value_error_context& core_ctx)
+{
+    tao::json::value ctx(core_ctx);
+    return { core_ctx.ec(), "", error_context(ctx) };
+}
+
+error
+make_error(const couchbase::subdocument_error_context& core_ctx)
+{
+    tao::json::value ctx(core_ctx);
+    return { core_ctx.ec(), "", error_context(ctx) };
+}
+} // namespace core::impl
 } // namespace couchbase

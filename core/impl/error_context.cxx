@@ -30,6 +30,15 @@ error_context::error_context(internal_error_context internal)
 }
 
 auto
+error_context::retry_attempts() const -> std::size_t
+{
+    if (const auto* attempts = internal_.find("retry_attempts"); attempts != nullptr) {
+        return attempts->get_unsigned();
+    }
+    return 0;
+}
+
+auto
 error_context::to_string() const -> std::string
 {
     return tao::json::to_string(internal_, 2);
