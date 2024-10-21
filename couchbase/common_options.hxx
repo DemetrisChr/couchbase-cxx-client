@@ -18,6 +18,7 @@
 #pragma once
 
 #include <couchbase/retry_strategy.hxx>
+#include <couchbase/tracing/request_span.hxx>
 
 #include <chrono>
 #include <memory>
@@ -69,6 +70,12 @@ public:
     return self();
   }
 
+  auto parent_span(const std::shared_ptr<tracing::request_span>& span) -> derived_class&
+  {
+    parent_span_ = span;
+    return self();
+  }
+
   /**
    * Immutable value object representing consistent options.
    *
@@ -78,6 +85,7 @@ public:
   struct built {
     const std::optional<std::chrono::milliseconds> timeout;
     const std::shared_ptr<couchbase::retry_strategy> retry_strategy;
+    const std::shared_ptr<tracing::request_span> parent_span;
   };
 
 protected:
@@ -88,7 +96,7 @@ protected:
    */
   [[nodiscard]] auto build_common_options() const -> built
   {
-    return { timeout_, retry_strategy_ };
+    return { timeout_, retry_strategy_, parent_span_ };
   }
 
   /**
@@ -107,6 +115,7 @@ protected:
 private:
   std::optional<std::chrono::milliseconds> timeout_{};
   std::shared_ptr<couchbase::retry_strategy> retry_strategy_{ nullptr };
+  std::shared_ptr<tracing::request_span> parent_span_{ nullptr };
 };
 
 } // namespace couchbase
