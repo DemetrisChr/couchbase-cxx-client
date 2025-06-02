@@ -60,5 +60,8 @@ auto
 make_error(const couchbase::core::transaction_op_error_context& core_ctx) -> error;
 
 auto
+make_error(const couchbase::core::transactions::op_exception& exc) -> error;
+
+auto
 make_error(const couchbase::core::transactions::transaction_operation_failed& core_tof) -> error;
 } // namespace couchbase::core::impl
